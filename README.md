@@ -203,6 +203,8 @@ Suggested in the [official Iceberg docs](https://iceberg.apache.org/docs/latest/
 - [Expire Snapshots](#snapshot-expiration)
 - [Remove old metadata files](#metadata-files)
 
+All SQL below is to be executed from the **Hive** Virtual Warehouse.
+
 ### Metadata files
 
 - A new metadata file is created with every commit and schema change to the table
