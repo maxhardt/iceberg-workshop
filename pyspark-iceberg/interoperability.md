@@ -63,7 +63,7 @@ spark.conf.set("spark.sql.catalog.hadoop_s3.warehouse", "s3a://mengel-uat1/tmp/s
 
 ```python
 flights_parquet = spark.read.parquet("s3a://mengel-uat1/warehouse/tablespace/external/hive/staging.db/flights_parquet")
-flights_parquet.createOrReplaceTmpView("flights_parquet")
+flights_parquet.createOrReplaceTempView("flights_parquet")
 spark.sql("CREATE DATABASE hadoop_s3.flights")
 spark.sql("CREATE TABLE hadoop_s3.flights.flights_ice AS SELECT * FROM flights_parquet")
 ```

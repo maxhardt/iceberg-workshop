@@ -208,6 +208,12 @@ All SQL below is to be executed from the **Hive** Virtual Warehouse.
 ### Metadata files
 
 - A new metadata file is created with every commit and schema change to the table
+- List all currently stored metadata files (should list multiple metadata files)
+
+```bash
+$ aws s3 ls --recursive s3://mengel-uat1/warehouse/tablespace/external/hive/mengelhardt_ice.db/airlines/metadata
+```
+
 - Set `previous-versions-max` to 1 to only keep the latest metadata file (not for production)
 - Enable `delete-after-commit` to allow query engines to delete old metadata files after every commit
 
