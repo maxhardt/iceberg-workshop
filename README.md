@@ -45,7 +45,7 @@ SHOW TABLES IN staging;
 - Create a database with your name as prefix
 
 ```sql
-CREATE DATABASE IF NOT EXISTS ${name}_ice;
+CREATE DATABASE IF NOT EXISTS ${user}_ice;
 ```
 
 - *Optional*: Make sure you can use the `aws` cli for tracking changes to metadata and data files for the `aws-se-cdp-sandbox-env` account
@@ -266,7 +266,6 @@ SELECT * FROM ${user}_ice.airlines.history;
 | 2022-11-28 11:01:13.03 Z |	6517620803989910949 |	NULL |	true |
 | 2022-11-28 11:01:20.083 Z |	5046963992640638903 |	6517620803989910949 |	true |
 | **2022-11-28 11:01:25.63 Z** |	7812932059031611813 |	5046963992640638903 |	true |
-
 
 - Expire all snapshots older than the current one
 
