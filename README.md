@@ -11,13 +11,13 @@
   - [Maintenance: Metadata and data files](#maintenance-metadata-and-data-files)
     - [Metadata files](#metadata-files)
     - [Snapshot expiration](#snapshot-expiration)
-    - [Data file compaction](#data-file-compaction)
+    - [Optional maintenance](#optional-maintenance)
   - [Cleanup](#cleanup)
 
 ## Goal
 
 - Internal workshop focussed on getting hands dirty with Iceberg on CDW and Iceberg v1 features.
-- The goal is to set up a partitioned fact `flights` and dimension `airlines` table in iceberg for analytics.
+- The workshop goes through the process of setting up a partitioned fact `flights` table and doing basic updates and maintenance on a dimension `airlines` table.
 
 ## Setup
 
@@ -102,21 +102,25 @@ VALUES ("ABC", "Real Fake Airlines");
 -- should return 1 record
 SELECT * FROM ${user}_ice.airlines
 WHERE code = "ABC";
+```
 
+- Use time travel to query the older snapshot
+
+```sql
 -- should not show any records
 SELECT * FROM ${user}_ice.airlines
-FOR SYSTEM_TIME AS OF "2022-11-29 00:00:00"
+FOR SYSTEM_TIME AS OF "<snapshot-timestamp>"
 WHERE code = "ABC";
 ```
 
 - Rollback the table to before the insert
 
 ```sql
-ALTER TABLE mengelhardt_ice.airlines
-EXECUTE rollback("2022-11-27 20:00:00");
+ALTER TABLE ${user}_ice.airlines
+EXECUTE rollback("<snapshot-id>");
 
 -- should not show any records
-SELECT * FROM mengelhardt_ice.airlines
+SELECT * FROM ${user}_ice.airlines
 WHERE code = "ABC";
 ```
 
@@ -194,28 +198,37 @@ WHERE year < 2022;
 
 ## Maintenance: Metadata and data files
 
+Suggested in the [official Iceberg docs](https://iceberg.apache.org/docs/latest/maintenance/#recommended-maintenance) are:
+
+- [Expire Snapshots](#snapshot-expiration)
+- [Remove old metadata files](#metadata-files)
+
 ### Metadata files
 
+- A new metadata file is created with every commit and schema change to the table
+- Set `previous-versions-max` to 1 to only keep the latest metadata file (not for production)
+- Enable `delete-after-commit` to allow query engines to delete old metadata files after every commit
+
 ```sql
-ALTER TABLE mengelhardt_ice.airlines
+ALTER TABLE ${user}_ice.airlines
 SET TBLPROPERTIES(
     "write.metadata.previous-versions-max"="1",
     "write.metadata.delete-after-commit.enabled"="true");
 
--- make a commit to the table by writing to it
-INSERT INTO mengelhardt_ice.airlines
-VALUES("ABC", "Real Fake Airlines");
+-- make a commit to the table by deleting records
+TRUNCATE TABLE ${user}_ice.airlines;
 ```
 
 - Verify old metadata files were removed
 
 ```bash
+$ aws s3 ls --recursive s3://mengel-uat1/warehouse/tablespace/external/hive/${user}_ice.db/airlines/metadata
+```
+
+- **Optional**: Deeper look into the updated `write.metadata` properties
+
+```bash
 $ aws s3 cp --recursive s3://mengel-uat1/warehouse/tablespace/external/hive/${user}_ice.db/airlines/metadata ./iceberg-metadata
-```
-
-- Verify settings show up in the latest metadata file
-
-```
 $ cat ./iceberg-metadata/metadata/<hash>.metadata.json | grep write.metadata
 
     "write.metadata.previous-versions-max" : "1",
@@ -224,11 +237,81 @@ $ cat ./iceberg-metadata/metadata/<hash>.metadata.json | grep write.metadata
 
 ### Snapshot expiration
 
-... #TODO
+- Using snapshot expiration can help with "housekeeping" old snapshots and referenced data files
+- Delete all records to create a new snapshot and orphaned data files
 
-### Data file compaction
+```sql
+TRUNCATE TABLE ${user}_ice.airlines;
+```
 
-... #TODO
+- Insert some data to create a new snapshot with new data files
+
+```sql
+INSERT INTO ${user}_ice.airlines
+VALUES("ABC", "Real Fake Airlines");
+```
+
+- Get the timestamp of the **latest snapshot**
+
+```
+SELECT * FROM ${user}_ice.airlines.history;
+```
+
+| airlines.made_current_at | airlines.snapshot_id	| airlines.parent_id | airlines.is_current_ancestor |
+|---|---|---|---|
+| 2022-11-28 11:00:59.118 Z |	6517620803989910949 |	NULL |	true |
+| 2022-11-28 11:01:03.938 Z |	1873082738288129896 |	6517620803989910949 |	false |
+| 2022-11-28 11:01:13.03 Z |	6517620803989910949 |	NULL |	true |
+| 2022-11-28 11:01:20.083 Z |	5046963992640638903 |	6517620803989910949 |	true |
+| **2022-11-28 11:01:25.63 Z** |	7812932059031611813 |	5046963992640638903 |	true |
+
+
+- Expire all snapshots older than the current one
+
+```sql
+ALTER TABLE ${user}_ice.airlines
+EXECUTE expire_snapshots("<snapshot-timestamp>");
+```
+
+- Verify that all snapshots are deleted but the current one
+
+```sql
+SELECT * FROM ${user}_ice.airlines.history;
+```
+
+- Verify that orphaned data files have been deleted as well (should show only one data file with one record)
+
+```bash
+$ aws s3 ls --recursive s3://mengel-uat1/warehouse/tablespace/external/hive/${user}_ice.db/airlines/
+```
+
+- **Optional**: Verify the data file only contains one record
+
+```bash
+$ aws s3 cp --recursive s3://mengel-uat1/warehouse/tablespace/external/hive/${user}_ice.db/airlines/data ./data
+$ parquet-tools show data/<data-file-name>.parquet
++--------+--------------------+
+| code   | description        |
+|--------+--------------------|
+| ABC    | Real Fake Airlines |
++--------+--------------------+
+```
+
+### Optional maintenance
+
+Suggested in the [official Iceberg docs](https://iceberg.apache.org/docs/latest/maintenance/#optional-maintenance) are also:
+
+- Compact data files (supported only from Spark at the moment)
+
+```sql
+CALL catalog_name.system.rewrite_data_files('db.sample')
+```
+
+- Rewrite manifests (supported only from Spark)
+
+```sql
+CALL catalog_name.system.rewrite_manifests('db.sample')
+```
 
 ## Cleanup
 
