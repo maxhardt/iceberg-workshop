@@ -1,22 +1,22 @@
 # Testing Interoparability of CDP Iceberg with external Spark
 
-- Even though both engines specify Iceberg v1 spec the produced metadata strucutre is different.
-- Attempting to read CDW Hive produced Iceberg table from Spark throws an error.
+- Within Iceberg v1 spec the resulting directory structure and naming convention are slightly different.
+- Read(-only) access from external Spark is possible by specifying the full filepath to the metadata location
 
-## Iceberg v1 Iceberg table created from CDW Hive
+## Creating an Iceberg v1 table from CDW Hive Virtual Warehouse
 
 ### Setup
 
 - From CDW Hive Virtual Warehouse with Iceberg support
 
-### Create table via CDW Hive
+### Create table in CDW Hive
 
 ```sql
-create external table ice.flights_ice_v1
-stored by iceberg
-stored as parquet
-tblproperties ('format-version' = '1')
-as select * from staging.flights_parquet
+CREATE EXTERNAL TABLE ice.flights_ice_v1
+STORED BY ICEBERG
+STORED AS PARQUET
+TBLPROPERTIES ('format-version' = '1')
+AS SELECT * FROM staging.flights_parquet
 ```
 
 - Produces following directory structure
@@ -29,7 +29,7 @@ as select * from staging.flights_parquet
 2022-11-26 15:00:45       3800 warehouse/tablespace/external/hive/ice.db/flights_ice_v1/metadata/snap-8519861019640010815-1-0fc7fdc3-c7e3-465b-acd1-3f8458f91e09.avro
 ```
 
-## Iceberg v1 table created from local Docker Spark
+## Creating an Iceberg v1 table created from local Spark on Docker
 
 ### Setup
 
@@ -49,9 +49,9 @@ docker exec -it spark-iceberg pyspark --packages org.apache.spark:spark-hadoop-c
 >>> spark._sc._jsc.hadoopConfiguration().set("fs.s3a.secret.key", os.environ["AWS_SECRET_ACCESS_KEY"])
 ```
 
-### Create table via Docker Spark
+### Creating an Iceberg table in a `hadoop` type catalog on S3
 
-- Setup a `HadoopCatalog` with S3 warehouse directory
+- Setup a `hadoop` type Iceberg catalog with S3 warehouse directory
 
 ```python
 spark.conf.set("spark.sql.catalog.hadoop_s3", "org.apache.iceberg.spark.SparkCatalog")
@@ -78,12 +78,32 @@ spark.sql("CREATE TABLE hadoop_s3.flights.flights_ice AS SELECT * FROM flights_p
 2022-11-26 12:44:30          1 tmp/spark/flights/flights_ice/metadata/version-hint.text
 ```
 
-# Attempting to read CDW created table from local Spark
+## Reading an Iceberg table created in CDW from local Spark on Docker
 
-- Throws following error looking for the `version-hint.text` file
+
+- Retrieve the metadata location from CDW
+
+```sql
+DESCRIBE FORMATTED ice.flights_ice_v1;
+/*
+...
+metadata_location
+
+s3a://goes-se-sandbox01/warehouse/tablespace/external/hive/mengel.db/ice/metadata/00001-217983c6-b390-473e-9be6-884f4655a507.metadata.json
+...
+*/
+```
+
+- Read the table in local Spark on Docker by specifying the full filepath to the metadata file
+
+```python
+>>> spark.read.format("iceberg").load("s3a://mengel-uat1/warehouse/tablespace/external/hive/ice.db/flights_ice_v1/metadata/00001-88c878dc-a897-4cc8-b1c8-36fa9b0f290f.metadata.json")
+```
+
+- **NOTE**: Full filepath to the metadata file must be specified, otherwise Spark throws an error looking for the `version-hint.text` file
 
 ```python
 >>> spark.read.format("iceberg").load("s3a://mengel-uat1/warehouse/tablespace/external/hive/ice.db/flights_ice_v1")
 22/11/26 14:10:01 WARN HadoopTableOperations: Error reading version hint file s3a://mengel-uat1/warehouse/tablespace/external/hive/ice.db/flights_ice_v1/metadata/version-hint.text
-java.io.FileNotFoundException: No such file or directory: s3a://mengel-uat1/warehouse/tablespace/external/hive/ice.db/flights_ice_v1/metadata/version-hint.text
+java.io.FileNotFoundException: No such file or `irectory: s3a://mengel-uat1/warehouse/tablespace/external/hive/ice.db/flights_ice_v1/metadata/version-hint.text
 ```
