@@ -1,4 +1,4 @@
-# Testing Interoparability of CDP Iceberg with external Spark
+# Testing Interoparability of CDW Iceberg with CDP-external Spark engine
 
 - Within Iceberg v1 spec the resulting directory structure and naming convention are slightly different.
 - Read(-only) access from external Spark is possible by specifying the full filepath to the metadata location
@@ -32,7 +32,7 @@ INSERT INTO mengel.ice VALUES(1);
 2022-11-26 15:00:45       3800 warehouse/tablespace/external/hive/mengel.db/ice/metadata/snap-8519861019640010815-1-0fc7fdc3-c7e3-465b-acd1-3f8458f91e09.avro
 ```
 
-## Creating an Iceberg v1 table created from local Spark on Docker
+## Creating an Iceberg v1 table created from CDP-external Spark engine
 
 ### Setup
 
@@ -82,7 +82,7 @@ $ aws s3 ls --recursive s3://goes-se-sandbox01/tmp/mengel/spark-hadoop-catalog/m
 2022-12-09 13:15:10          1 tmp/mengel/spark-hadoop-catalog/mengel/ice/metadata/version-hint.text
 ```
 
-## Reading an Iceberg table created in CDW from local Spark on Docker
+## Reading an Iceberg table created in CDP-external Spark engine with CDW
 
 - Retrieve the metadata location from CDW
 
@@ -111,7 +111,7 @@ s3a://goes-se-sandbox01/warehouse/tablespace/external/hive/mengel.db/ice/metadat
 java.io.FileNotFoundException: No such file or directory: s3a://goes-se-sandbox01/warehouse/tablespace/external/hive/mengel.db/ice/metadata/version-hint.text
 ```
 
-## Full integration of CDP Iceberg tables and local Spark on Docker via `hive` type catalog against CDP HMS
+## Full integration of CDP Iceberg tables and CDP-external Spark engine via `hive` type catalog against CDP HMS
 
 - For full integration an Iceberg catalog that points to the CDP HMS is needed
 - This should, in theory, also allow updating or deleting the table, which can then be read again by CDP services, e.g. CDW
