@@ -108,7 +108,7 @@ s3a://goes-se-sandbox01/warehouse/tablespace/external/hive/mengel.db/ice/metadat
 ```python
 >>> spark.read.format("iceberg").load("s3a://goes-se-sandbox01/warehouse/tablespace/external/hive/mengel.db/ice")
 22/11/26 14:10:01 WARN HadoopTableOperations: Error reading version hint file s3a://goes-se-sandbox01/warehouse/tablespace/external/hive/mengel.db/ice/metadata/version-hint.text
-java.io.FileNotFoundException: No such file or `irectory: s3a://goes-se-sandbox01/warehouse/tablespace/external/hive/mengel.db/ice/metadata/version-hint.text
+java.io.FileNotFoundException: No such file or directory: s3a://goes-se-sandbox01/warehouse/tablespace/external/hive/mengel.db/ice/metadata/version-hint.text
 ```
 
 ## Full integration of CDP Iceberg tables and local Spark on Docker via `hive` type catalog against CDP HMS
